@@ -57,12 +57,10 @@ use std::sync::mpsc;
 use std::sync::Mutex;
 use std::any::Any;
 
-fn with_refs<F, /*R: Any + Send + 'static*/>(mut r:F) where F : FnMut(&GtkRefs) + Send + Sync + 'static {
+fn with_refs<F>(r:F) where F : FnMut(&GtkRefs) + Send + 'static {
     let tx = TX.lock().unwrap();
     let (back_tx, back_rx) = mpsc::channel();
-    //let r = &'static r;
-    let r2 : Box<FnMut(&GtkRefs) -> Box<Any + Send + 'static> + Send + 'static > = Box::new(|refs| { Box::new(r(refs)) } );
-    tx.as_ref().unwrap().send((r2, back_tx)).unwrap();
+    tx.as_ref().unwrap().send((Box::new(r), back_tx)).unwrap();
     handle_one();
 }
 
@@ -91,7 +89,7 @@ pub fn external_element_access() {
     // example: headerbar.set_title("Title was set by external function")
 }
 
-type FnAndBack = (Box<FnMut(&GtkRefs) -> Box<Any + Send> + Send>, mpsc::Sender<Box<Any + Send>>);
+type FnAndBack = (Box<FnMut(&GtkRefs) + Send>, mpsc::Sender<Box<Any + Send>>);
 
 thread_local!(
     static REFS: RefCell<Option<GtkRefs>> = RefCell::new(None);
