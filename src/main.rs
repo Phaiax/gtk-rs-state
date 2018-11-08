@@ -21,9 +21,11 @@ fn main() {
     let glade_src = include_str!("../ui.glade");
     let builder = gtk::Builder::new_from_string(glade_src);
     widgets::store_refs(&builder);
+
     // Optional: You can use the WidgetRefs type as a helper in
     // the main thread for yourself.
     let refs = widgets::WidgetRefs::from(&builder);
+
     // This type has a function for each of your widgets.
     // These functions return a clone() of the widget.
     refs.main_window().show_all();
