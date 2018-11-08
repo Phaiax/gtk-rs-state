@@ -197,22 +197,3 @@ macro_rules! gtk_refs {
 }
 
 
-
-
-// type BoxedUiActionReturn = Box<dyn Any + Send>;
-// type BoxedUiAction<'a> = Box<FnBox(&GtkRefs) -> BoxedUiActionReturn + Send + 'a>;
-
-// fn boxify_fn_once<'g, F: (FnOnce(&'g GtkRefs) -> A) + 'static, A: 'static + Any + Send>(cb: F) -> BoxedUiAction<'static>
-// {
-//     let c : BoxedUiAction<'static> = Box::new(move |r| {
-//         let b: BoxedUiActionReturn = Box::new(cb(r));
-//         b
-//     });
-//     c
-// }
-
-
-
-
-
-
