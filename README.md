@@ -5,6 +5,10 @@
 
 Requires nightly.
 
+This is not a library and not on crates.io because I am not sure if this is
+idiomatic and if the usage of unsafe is valid. If you want to use this,
+just copy the `src/withgtk.rs` into your project.
+
 This is not the fastest implementation, but for almost all
 use cases this should be enough.
 
