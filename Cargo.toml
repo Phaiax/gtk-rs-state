@@ -11,5 +11,5 @@ lazy_static = "*"
 version = "0.5.0"
 features = ["v3_10"]
 
-[dependencies.gobject-sys]
-version = "0.7.0"
+[dependencies.glib]
+version = "0.6.0"

@@ -1,51 +1,21 @@
 #![allow(dead_code, unused_variables, unused_imports, deprecated)]
+#![feature(fnbox)]
+
+mod withgtk;
 
 use std::thread;
-
 use gtk::prelude::*;
-
 use gtk::{Button, Window, WindowType};
+use std::time::SystemTime;
 
-use lazy_static::lazy_static;
-
-use gobject_sys::g_signal_new;
-
-fn main() {
-    init_gtk();
-}
+// fn main() {
+//     init_gtk();
+// }
 
 
-macro_rules! gtk_refs {
-    ( $( $t:ty => $i:ident ),* ) => {
-       gtk_refs!( GET_REFS: $( $t => $i ),* );
-       gtk_refs!( REF_STRUCT: $( $t => $i ),* );
-       gtk_refs!( IMPL_GETTERS: $( $t => $i ),* );
-    };
-    ( GET_REFS: $( $t:ty => $i:ident ),* ) => {
-        use std::cell::RefCell;
-        impl From<&gtk::Builder> for GtkRefs {
-            fn from(builder: &gtk::Builder) -> GtkRefs {
-                GtkRefs {
-                    $($i : RefCell::new(builder.get_object(stringify!($i)).unwrap()), )*
-                }
-            }
-        }
-    };
-    ( REF_STRUCT: $( $t:ty => $i:ident ),* ) => {
-        struct GtkRefs {
-            $( pub $i : RefCell<$t>, )*
-        }
-    };
-    ( IMPL_GETTERS: $( $t:ty => $i:ident ),* ) => {
-        impl GtkRefs {
-            $( pub fn $i(&self) -> $t {
-                use std::ops::Deref;
-                return self.$i.borrow().deref().clone(); } )*
-        }
-    };
-}
 
 gtk_refs!(
+    glade1:
     gtk::Window => main_window,
     gtk::Button => button1,
     gtk::Button => button2,
@@ -53,31 +23,8 @@ gtk_refs!(
     gtk::Entry => entry1
 );
 
-use std::sync::mpsc;
-use std::sync::Mutex;
-use std::any::Any;
 
-fn with_refs<F>(r:F) where F : FnMut(&GtkRefs) + Send + 'static {
-    let tx = TX.lock().unwrap();
-    let (back_tx, back_rx) = mpsc::channel();
-    tx.as_ref().unwrap().send((Box::new(r), back_tx)).unwrap();
-    handle_one();
-}
 
-fn handle_one() {
-    gtk::idle_add(|| {
-        RX.with(|rx| {
-            let rx = rx.borrow();
-            let mut bc : FnAndBack = rx.as_ref().unwrap().recv().unwrap();
-            REFS.with(|refs| {
-                let refs = refs.borrow();
-                let refs = refs.as_ref().unwrap();
-                (*bc.0)(&refs);
-            });
-        });
-        Continue(false)
-    });
-}
 
 pub fn call_and_pass_borrow(headerbar: &gtk::Entry) {
     // headerbar clone borrow is passed into this function so it has access to headerbar
@@ -89,16 +36,35 @@ pub fn external_element_access() {
     // example: headerbar.set_title("Title was set by external function")
 }
 
-type FnAndBack = (Box<FnMut(&GtkRefs) + Send>, mpsc::Sender<Box<Any + Send>>);
 
-thread_local!(
-    static REFS: RefCell<Option<GtkRefs>> = RefCell::new(None);
-    static RX: RefCell<Option<mpsc::Receiver<FnAndBack>>> = RefCell::new(None);
+gtk_refs!(
+    glade2:                         // modulename
+    gtk::Window => main_window,     // Widgettype => widget_name_from_glade
+    gtk::Entry => entry1
 );
+fn main() {
+    gtk::init().unwrap();
+    let glade_src = include_str!("../ui.glade");
+    let builder = gtk::Builder::new_from_string(glade_src);
+    glade2::store_refs(&builder);
+    // Optional: You can use the WidgetRefs type as a helper in
+    // the main thread for yourself.
+    let refs = glade2::WidgetRefs::from(&builder);
+    // This type has a function for each of your widgets.
+    // These functions return a clone() of the widget.
+    refs.main_window().show_all();
 
-lazy_static!(
-    static ref TX: Mutex<Option<mpsc::Sender<FnAndBack>>> = Mutex::new(None);
-);
+    // Start event loop and some other thread
+    std::thread::spawn(thread_fn);
+
+    gtk::main();
+ }
+
+ fn thread_fn()  {
+    glade2::with_refs(|refs| {
+        refs.entry1().set_text("Blub!");
+    });
+ }
 
 pub fn init_gtk() {
     if gtk::init().is_err() {
@@ -107,7 +73,8 @@ pub fn init_gtk() {
     }
     let glade_src = include_str!("../ui.glade");
     let builder = gtk::Builder::new_from_string(glade_src);
-    let refs = GtkRefs::from(&builder);
+
+    let refs = glade1::WidgetRefs::from(&builder);
 
     // main_window and all its elements
 
@@ -133,25 +100,60 @@ pub fn init_gtk() {
 
 
 
-
     refs.main_window().show_all();
 
 
-    let (tx_fn, rx_fn) = mpsc::channel();
-    REFS.with(|refs_| { *refs_.borrow_mut() = Some(refs); });
-    RX.with(|rx| { *rx.borrow_mut() = Some(rx_fn); });
-    *TX.lock().unwrap() = Some( tx_fn );
+    glade1::store_refs(&builder);
 
 
-
+    // This is an example and a very bad idea in once.
+    //
     thread::spawn(|| {
-        thread::sleep_ms(2000);
-        with_refs(|_| {
-            println!("with_refs called");
-        });
+
+        let start = SystemTime::now();
+        let mut loops = 0u64;
+        loop {
+            loops += 1;
+            let elapsed = start.elapsed().unwrap();
+            let timedisplay = format!("{}s.{}", elapsed.as_secs(), elapsed.subsec_micros());
+            glade1::with_refs(move |refs| {
+                refs.entry1().set_text(&timedisplay);
+            });
+            if loops % 1000 == 0 {
+                let elapsed_us = (elapsed.as_secs() * 1000000) + elapsed.subsec_micros() as u64;
+                let time_per_loop = elapsed_us as f32 / loops as f32;
+                println!("Loop time: {} µs", time_per_loop);
+            }
+            //zthread::sleep_ms(1);
+        }
+
     });
 
+    thread::spawn(|| {
 
+        let mut temp = 22;
 
-    gtk::main();
+        glade1::with_refs(move |refs| {
+            temp += 2;
+            //*TEMP.lock().unwrap() = Some(&temp);
+            panic!("Boom");
+        });
+
+    });
+
+    std::panic::catch_unwind(|| {
+        gtk::main();
+    }).ok();
+    thread::sleep_ms(100);
 }
+
+use lazy_static::lazy_static;
+use std::sync::Mutex;
+
+lazy_static!(
+    /// This is the sender part of the above RX channel. All non-gtk
+    /// threads can put their UiActions-Closures here and wait for
+    /// completion afterwards.
+    static ref TEMP: Mutex<Option<&'static u32>> = Mutex::new(None);
+);
+
