@@ -92,16 +92,20 @@ macro_rules! gtk_refs {
             /// Initializes the static storages.
             /// You must call this function before calling `with_refs()`.
             /// See `withgtk` module documentation for examples.
-            pub fn store_refs(builder: &gtk::Builder) {
+            pub fn store_refs(refs: WidgetRefs) {
                 if TX.lock().unwrap().is_some() {
                     panic!("You must only call store_refs() once!");
                 }
 
-                let refs : WidgetRefs = builder.into();
                 let (uiactions_tx, uiactions_rx) = mpsc::channel();
                 REFS.with(|refs_| { *refs_.borrow_mut() = Some(Rc::new(refs)); });
                 RX.with(|rx| { *rx.borrow_mut() = Some(uiactions_rx); });
                 *TX.lock().unwrap() = Some( uiactions_tx );
+            }
+
+            pub fn store_refs_from_builder(builder: &gtk::Builder) {
+                let refs : WidgetRefs = builder.into();
+                store_refs(refs);
             }
 
             /// Call this from wherever you want (especially from non-gtk threads).
