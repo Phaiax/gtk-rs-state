@@ -4,6 +4,12 @@ pub mod fnbox;
 pub mod withgtk;
 pub mod widgetrefs;
 
+pub mod _modexport {
+    pub use glib::source::idle_add;
+    pub use gtk::Continue;
+    pub use lazy_static::lazy_static;
+}
+
 #[macro_export]
 macro_rules! gtk_refs {
     ( $name:ident: $( $t:ty => $i:ident ),* ) => {

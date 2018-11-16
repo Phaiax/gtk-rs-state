@@ -10,14 +10,14 @@ macro_rules! with_gtk {
         use std::sync::Mutex;
         use std::rc::Rc;
         use std::any::Any;
-        use glib::source::idle_add;
-        use gtk::Continue;
+
         use $crate::fnbox::SendBoxFnOnce;
         use $crate::fnbox::FnBox;
 
+        use $crate::_modexport::idle_add;
+        use $crate::_modexport::Continue;
         // macros
-        use super::gtk_refs;
-        use lazy_static::lazy_static;
+        use $crate::_modexport::lazy_static;
 
 
         type BoxedUiAction = SendBoxFnOnce<'static, (Rc<$struct>, )>;
