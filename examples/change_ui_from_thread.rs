@@ -1,11 +1,10 @@
 #![allow(dead_code, unused_variables, unused_imports, deprecated)]
 #![feature(fnbox)]
 
-mod withgtk;
-
 use std::thread;
 use gtk::prelude::*;
 
+use gtk_rs_state::gtk_refs;
 
 gtk_refs!(
     widgets:                         // modulename

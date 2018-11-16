@@ -3,7 +3,7 @@
 
 [reddit question](https://www.reddit.com/r/rust/comments/9uz3qn/what_is_the_best_way_to_structure_a_gtk_rust/)
 
-Requires nightly.
+Runs on stable.
 
 This is not a library and not on crates.io because I am not sure if this is
 idiomatic and if the usage of unsafe is valid. If you want to use this,
@@ -87,10 +87,6 @@ Closures from multiple threads will always run sequentially.
 
 # Notes:
 
-## Nightly
-
-I think it should be possible without the nightly FnBox
-feature, but I could not get over the lifetime errors.
 
 ## Unsafe
 

@@ -1,6 +1,6 @@
 [package]
-name = "gtktest"
-version = "0.1.0"
+name = "gtk-rs-state"
+version = "0.2.0"
 authors = ["Phaiax <phaiax-git@invisibletower.de>"]
 edition = "2018"
 

@@ -49,10 +49,12 @@ macro_rules! gtk_refs {
 
             use std::sync::mpsc;
             use std::sync::Mutex;
+            use std::rc::Rc;
             use std::any::Any;
-            use std::boxed::FnBox;
             use glib::source::idle_add;
             use gtk::Continue;
+            use $crate::fnbox::SendBoxFnOnce;
+            use $crate::fnbox::FnBox;
 
             // macros
             use super::gtk_refs;
@@ -62,7 +64,7 @@ macro_rules! gtk_refs {
             gtk_refs!( ;REF_STRUCT; $( $t => $i ),* );
             gtk_refs!( ;IMPL_GETTERS; $( $t => $i ),* );
 
-            type BoxedUiAction = Box<FnBox(&WidgetRefs) + Send + 'static>;
+            type BoxedUiAction = SendBoxFnOnce<'static, (Rc<WidgetRefs>, )>;
             type FnAndEvent = (BoxedUiAction, mpsc::Sender<()>);
 
 
@@ -70,7 +72,7 @@ macro_rules! gtk_refs {
                 /// This variable is only populated in the gtk thread.
                 /// The inner struct contains a reference counted
                 /// pointer to all selected widgets.
-                static REFS: RefCell<Option<WidgetRefs>> = RefCell::new(None);
+                static REFS: RefCell<Option<Rc<WidgetRefs>>> = RefCell::new(None);
                 /// This variable is only populated in the gtk thread.
                 /// The gtk thread receives the boxed UiActions-Closures via
                 /// this channel. Additionaly, another channels sender is
@@ -97,15 +99,15 @@ macro_rules! gtk_refs {
 
                 let refs : WidgetRefs = builder.into();
                 let (uiactions_tx, uiactions_rx) = mpsc::channel();
-                REFS.with(|refs_| { *refs_.borrow_mut() = Some(refs); });
+                REFS.with(|refs_| { *refs_.borrow_mut() = Some(Rc::new(refs)); });
                 RX.with(|rx| { *rx.borrow_mut() = Some(uiactions_rx); });
                 *TX.lock().unwrap() = Some( uiactions_tx );
             }
 
             /// Call this from wherever you want (especially from non-gtk threads).
             /// The closure argument allows you to modify the ui.
-            pub fn with_refs<'a, F>(uiaction: F) where F : FnOnce(&WidgetRefs) + Send + 'a {
-                let uiaction : Box<FnBox(&WidgetRefs) + Send + 'a> = Box::new(uiaction);
+            pub fn with_refs<'a, F>(uiaction: F) where F : FnOnce(Rc<WidgetRefs>) + Send + 'a {
+                let uiaction : SendBoxFnOnce<'a, (Rc<WidgetRefs>, )> = SendBoxFnOnce::from(uiaction);
                 // Extend the livetime to be static
                 // I think this should work, because we use the `event_callback_finished_..`
                 // mechanism to wait until the closure has finished executing.
@@ -115,8 +117,8 @@ macro_rules! gtk_refs {
                 // 'a to static in this function definition.
                 let uiaction = unsafe {
                      std::mem::transmute::
-                        <Box<FnBox(&WidgetRefs) + Send + 'a>,
-                         Box<FnBox(&WidgetRefs) + Send + 'static>>(uiaction)
+                        <SendBoxFnOnce<'a, (Rc<WidgetRefs>, )>,
+                         SendBoxFnOnce<'static, (Rc<WidgetRefs>, )>>(uiaction)
                 };
                 let uiactions_tx = TX.lock().unwrap();
                 let (event_callback_finished_tx,
@@ -160,7 +162,8 @@ macro_rules! gtk_refs {
                             let refs = refs.borrow();
                             let refs = refs.as_ref()
                                            .expect("Please call store_refs() in the gtk thread before using with_refs()");
-                            uiaction.call_box((refs, ));
+                            let refs : Rc<WidgetRefs> = refs.clone();
+                            uiaction.call(refs);
                         });
                         finished_callback.send(()).unwrap();
                     });
