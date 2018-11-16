@@ -34,7 +34,7 @@ Note that the function `external_element_access` needs no reference to the widge
 
 ```rust
 gtk_refs!(
-    widgets:                         // modulename
+    widgets:                        // The macro emits a new module with this name
     gtk::Window => main_window,     // Widgettype => widget_name_from_glade
     gtk::Button => button1,
     gtk::Button => button2,

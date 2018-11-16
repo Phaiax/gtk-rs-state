@@ -35,7 +35,7 @@ fn main() {
     });
 
     button.connect_clicked(|_| {
-        std::thread::spawn(external_element_access);
+        std::thread::spawn(some_workfunction);
         println!("Clicked!");
     });
 
@@ -47,8 +47,8 @@ fn main() {
         button1:     RefCell::new(button.clone()),
     };
 
-    widgets::store_refs(widget_references);
-    // En
+    widgets::init_storage(widget_references);
+    // End
 
     // This type has a function for each of your widgets.
     // These functions return a clone() of the widget.
@@ -59,8 +59,7 @@ fn main() {
         Inhibit(false)
     });
 
-    // Start event loop and some other thread
-
+    // Start event loop
     gtk::main();
 }
 
@@ -70,7 +69,7 @@ fn compute() {
     sleep(Duration::from_secs(1));
 }
 
-fn external_element_access()  {
+fn some_workfunction()  {
     let mut i = 0;
 
     loop {
@@ -79,7 +78,7 @@ fn external_element_access()  {
         i += 1;
         let text = format!("Round {} in {:?}", i, std::thread::current().id());
 
-        widgets::with_refs(|refs| {
+        widgets::do_in_gtk_eventloop(|refs| {
             refs.button1().set_label(&text);
         });
     }

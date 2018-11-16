@@ -19,7 +19,7 @@ fn main() {
     gtk::init().unwrap();
     let glade_src = include_str!("../ui.glade");
     let builder = gtk::Builder::new_from_string(glade_src);
-    widgets::store_refs_from_builder(&builder);
+    widgets::init_storage_from_builder(&builder);
 
     // Optional: You can use the WidgetRefs type as a helper in
     // the main thread for yourself.
@@ -35,7 +35,7 @@ fn main() {
     });
 
     // Start event loop and some other thread
-    std::thread::spawn(external_element_access);
+    std::thread::spawn(some_other_thread);
 
     gtk::main();
 }
@@ -47,7 +47,7 @@ fn compute() {
     sleep(Duration::from_secs(1));
 }
 
-fn external_element_access()  {
+fn some_other_thread()  {
     let mut i = 0;
 
     loop {
@@ -56,7 +56,7 @@ fn external_element_access()  {
         i += 1;
         let text = format!("Round {}", i);
 
-        widgets::with_refs(|refs| {
+        widgets::do_in_gtk_eventloop(|refs| {
             refs.entry1().set_text(&text);
         });
     }
