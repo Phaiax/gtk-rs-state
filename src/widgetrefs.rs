@@ -11,7 +11,7 @@ macro_rules! widget_refs {
 
     };
     ( ;GET_REFS; $structname:ident ; $( $i:ident : $t:ty ),* ) => {
-        impl From<&gtk::Builder> for $structname {
+        impl<'a> From<&'a gtk::Builder> for $structname {
             fn from(builder: &gtk::Builder) -> WidgetRefs {
                 $structname {
                     $($i : builder.get_object(stringify!($i)).unwrap(), )*

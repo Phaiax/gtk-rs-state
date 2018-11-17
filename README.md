@@ -138,8 +138,52 @@ The macro generates the following code:
  - Closures from multiple threads will always run sequentially.
  - If the closure panics, `do_in_gtk_eventloop()` will panic as well. You may not see the panic because the process will exit too fast.
 
-## Please also see the examples folder if you n.
+Please also see the examples folder if you want to:
+    - Use additional non-send fields in the struct (other stuff than widget references)
+    - Use glade
 
+## How does it really work?
+
+```text
++---------------------------------+   +----------------------------------+
+|GTK event loop thread            |   |Global statics                    |
+|                                 |   |                                  |
+|  +----------------------------+ |   |  TX : Sender<(Fn, Cb)>           |
+|  |Thread local statics        | |   |                                  |
+|  |                            | |   |                                  |
+|  |  DATA : Non-Send Refereces | |   +----------------------------------+
+|  |  RX : Receiver<(Fn, Cb)>   | |
+|  |                            | |   +----------------------------------+
+|  +----------------------------+ |   |Some other thread                 |
+|                                 |   |                                  |
+|                                 |   |  do some stuff                   |
+|  +---------------------------+  |   |                                  |
+|  |event loop()               |  |   |  call do_in_gtk_eventloop(Fn)    |
+|  |                           |  |   |    This Fn has access to DATA    |
+|  |  +----------------------+ |  |   |                                  |
+|  |  |closure added with    | |  |   |                                  |
+|  |  |idle_add() to execute | |  |   +----------------------------------+
+|  |  |on the gtk thread {   | |  |
+|  |  |                      <-----------------------------------------------+
+|  |  |  Pop (Fn,Cb) from RX | |  |                                          |
+|  |  |  Call Fn(DATA)       | |  |                                          |
+|  |  |  Signal end of Fn    | |  |   +----------------------------------+   |
+|  |  |   via Cb             | |  |   |do_in_gtk_eventloop(Fn)           |   |
+|  |  |                      | |  |   |                                  |   |
+|  |  |                      | |  |   |  Box closure Fn and transmute    |   |
+|  |  +----------------------+ |  |   |   livetime to 'static            |   |
+|  |                           |  |   |                                  |   |
+|  +---------------------------+  |   |  Create a signal Cb              |   |
+|                                 |   |  Push (boxed Fn, Cb) to TX       |   |
++---------------------------------+   |  Add this closure via idle_add() +---+
+                                      |  Wait for the signal Cb          |
+                                      |  return                          |
+                                      |                                  |
+                                      |                                  |
+                                      +----------------------------------+
+```
+
+`init_storage()` initializes DATA, RX and TX.
 
 ## Use of `unsafe`
 

@@ -1,8 +1,9 @@
-#![allow(dead_code, unused_variables, unused_imports, deprecated)]
+
+extern crate gtk;
+extern crate gtk_rs_state;
 
 use std::rc::Rc;
-use core::cell::RefCell;
-use std::thread;
+use std::cell::RefCell;
 
 
 use gtk::prelude::*;

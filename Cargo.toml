@@ -2,7 +2,7 @@
 name = "gtk-rs-state"
 version = "0.2.0"
 authors = ["Phaiax <phaiax-git@invisibletower.de>"]
-edition = "2018"
+#edition = "2018"
 
 [dependencies]
 lazy_static = "1"
