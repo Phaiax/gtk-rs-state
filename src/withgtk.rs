@@ -10,6 +10,7 @@ macro_rules! with_gtk {
         use std::sync::Mutex;
         use std::rc::Rc;
         use std::any::Any;
+        use std::cell::RefCell;
 
         use $crate::fnbox::SendBoxFnOnce;
         use $crate::fnbox::FnBox;
@@ -28,7 +29,7 @@ macro_rules! with_gtk {
             /// This variable is only populated in the gtk thread.
             /// The inner struct contains a reference counted
             /// pointer to all selected widgets.
-            static REFS: RefCell<Option<Rc<$struct>>> = RefCell::new(None);
+            static DATA: RefCell<Option<Rc<$struct>>> = RefCell::new(None);
             /// This variable is only populated in the gtk thread.
             /// The gtk thread receives the boxed UiActions-Closures via
             /// this channel. Additionaly, another channels sender is
@@ -46,23 +47,22 @@ macro_rules! with_gtk {
 
 
         /// Initializes the static storages.
-        /// You must call this function before calling `with_refs()`.
-        /// See `withgtk` module documentation for examples.
+        /// You must call this function before calling `do_in_gtk_eventloop()`.
         pub fn init_storage(data: $struct) {
             if TX.lock().unwrap().is_some() {
                 panic!("You must only call init_storage() once!");
             }
 
             let (uiactions_tx, uiactions_rx) = mpsc::channel();
-            REFS.with(|refs_| { *refs_.borrow_mut() = Some(Rc::new(data)); });
+            DATA.with(|refs_| { *refs_.borrow_mut() = Some(Rc::new(data)); });
             RX.with(|rx| { *rx.borrow_mut() = Some(uiactions_rx); });
             *TX.lock().unwrap() = Some( uiactions_tx );
         }
 
 
 
-        /// Call this from wherever you want (especially from non-gtk threads).
-        /// The closure argument allows you to modify the ui.
+        /// Call this from non-gtk threads.
+        /// The closure allows you to modify the ui.
         pub fn do_in_gtk_eventloop<'a, F>(uiaction: F) where F : FnOnce(Rc<$struct>) + Send + 'a {
             let uiaction : SendBoxFnOnce<'a, (Rc<$struct>, )> = SendBoxFnOnce::from(uiaction);
             // Extend the livetime to be static
@@ -81,14 +81,14 @@ macro_rules! with_gtk {
             let (event_callback_finished_tx,
                  event_callback_finished_rx) = mpsc::channel();
             uiactions_tx.as_ref()
-                        .expect("Please call store_refs() in the gtk thread before using with_refs()")
+                        .expect("Please call init_storage() in the gtk thread before using with_refs()")
                         .send((uiaction, event_callback_finished_tx))
                         .expect("Gtk thread seems to have panicked!");
 
             // Notify the gtk event loop and perform the uiaction
             handle_one_callback_in_gtk_thread();
             // wait until gtk thread has executed the closure
-            event_callback_finished_rx.recv().expect("withgtk: with_refs: The closure has paniced while executing!");
+            event_callback_finished_rx.recv().expect("gtk-rs-state: do_in_gtk_eventloop(): The closure has paniced while executing!");
         }
 
         fn handle_one_callback_in_gtk_thread() {
@@ -96,29 +96,29 @@ macro_rules! with_gtk {
                 RX.with(|uiactions_rx| {
                     let uiactions_rx = uiactions_rx.borrow();
                     // The first unwrap happens when the user forgot to initialize
-                    // but since with_refs just successfully unpacked the uiactions_tx part
+                    // but since do_in_gtk_eventloop just successfully unpacked the uiactions_tx part
                     // this can never fail.
                     // The second unwrap(/expect) happens if there are no more items in the queue
                     // and all senders have disconnected.
-                    // The first can not happen since
-                    // with_refs just added an item, the second cannot happen because
+                    // The first unwrap can not happen since
+                    // do_in_gtk_eventloop just added an item, the second unwrap cannot happen because
                     // the sender is a not thread-local static which we never clear
                     // (at least in the current implementation).
                     // There is a possible race condition if the user calls
-                    // store_refs multiple times and some thread uses an old sender
+                    // init_storage multiple times and some thread uses an old sender
                     // while we swap the sender. The callback that this thread issues
                     // will then use the new receiver which has no elements in it.
                     // Then this will wait indefinitly.
                     let bc : FnAndEvent = uiactions_rx.as_ref().unwrap()
                         .try_recv()
-                        .expect("Race condition! I guess you called `store_refs` more than once!");
+                        .expect("Race condition! I guess you called `init_storage` more than once!");
                     let (uiaction, finished_callback) = bc;
                     // Call the uiaction with the references to all the gtk widgets.
-                    // REFS is Some() because we are called in the gtk thread.
-                    REFS.with(|refs| {
+                    // DATA is Some() because we are called in the gtk thread.
+                    DATA.with(|refs| {
                         let refs = refs.borrow();
                         let refs = refs.as_ref()
-                                       .expect("Please call store_refs() in the gtk thread before using with_refs()");
+                                       .expect("Please call init_storage() in the gtk thread before using with_refs()");
                         let refs : Rc<$struct> = refs.clone();
                         uiaction.call(refs);
                     });

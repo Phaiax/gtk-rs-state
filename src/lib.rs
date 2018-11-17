@@ -12,59 +12,99 @@ pub mod _modexport {
 
 #[macro_export]
 macro_rules! gtk_refs {
-    ( $name:ident: $( $t:ty => $i:ident ),* ) => {
+    ( $modpub:vis mod $modname:ident ; struct $structname:ident ; $( $i:ident : $t:ty ),* ) => {
 
 
         ///
         /// # Usage
         ///
         /// ```
-        /// use std::thread;
-        /// use gtk::prelude::*;
-        /// mod withgtk;
-        ///
         /// gtk_refs!(
-        ///     glade1:                         // modulename
-        ///     gtk::Window => main_window,     // Widgettype => widget_name_from_glade
-        ///     gtk::Entry => entry1
+        ///     pub mod widgets;                // The macro emits a new module with this name
+        ///     struct WidgetRefs;              // The macro emits a struct with this name containing:
+        ///     main_window : gtk::Window ,     // widget_name : Widgettype
+        ///     button1 : gtk::Button           // ..
         /// );
         ///
         /// fn main() {
-        ///     gtk::init().unwrap();
-        ///     let glade_src = include_str!("ui.glade");
-        ///     let builder = gtk::Builder::new_from_string(glade_src);
-        ///     glade1::store_refs(&builder);
         ///
-        ///     // Optional: You can use the WidgetRefs type as a helper in
-        ///     // the main thread for yourself.
-        ///     let refs = glade1::WidgetRefs::from(&builder);
+        ///     if gtk::init().is_err() {
+        ///         println!("Failed to initialize GTK.");
+        ///         return;
+        ///     }
+        ///
+        ///     let window = Window::new(WindowType::Toplevel);
+        ///     window.set_title("gtk-rs-state Example Program");
+        ///     window.set_default_size(350, 70);
+        ///     let button = Button::new_with_label("Spawn another thread!");
+        ///     window.add(&button);
+        ///     window.show_all();
+        ///
+        ///     window.connect_delete_event(|_, _| {
+        ///         gtk::main_quit();
+        ///         Inhibit(false)
+        ///     });
+        ///
+        ///     button.connect_clicked(|_| {
+        ///         std::thread::spawn(some_workfunction);
+        ///         println!("Clicked!");
+        ///     });
+        ///
+        ///     // You need the following two statements to prepare the
+        ///     // static storage needed for cross thread access.
+        ///     // See the `from_glade.rs` example for a more elegant solution
+        ///     let widget_references = widgets::WidgetRefs {
+        ///         main_window: window.clone(),
+        ///         button1:     button.clone(),
+        ///     };
+        ///
+        ///     widgets::init_storage(widget_references);
+        ///     // End
         ///
         ///     // This type has a function for each of your widgets.
         ///     // These functions return a clone() of the widget.
-        ///     refs.main_window().show_all();
+        ///     window.show_all();
         ///
-        ///     // Start event loop and some other thread
-        ///     std::thread::spawn(thread_fn);
-        ///     gtk::main();
-        ///  }
-        ///
-        ///  fn thread_fn()  {
-        ///     glade1::with_refs(|refs| {
-        ///         refs.entry1().set_text("Blub!");
+        ///     window.connect_delete_event(move |_, _| {
+        ///         gtk::main_quit();
+        ///         Inhibit(false)
         ///     });
-        ///  }
+        ///
+        ///     // Start event loop
+        ///     gtk::main();
+        /// }
+        ///
+        /// fn compute() {
+        ///     use std::thread::sleep;
+        ///     use std::time::Duration;
+        ///     sleep(Duration::from_secs(1));
+        /// }
+        ///
+        /// fn some_workfunction()  {
+        ///     let mut i = 0;
+        ///
+        ///     loop {
+        ///         compute();
+        ///
+        ///         i += 1;
+        ///         let text = format!("Round {} in {:?}", i, std::thread::current().id());
+        ///
+        ///         widgets::do_in_gtk_eventloop(|refs| {
+        ///             refs.button1().set_label(&text);
+        ///         });
+        ///     }
+        /// }
+        /// ```
         ///
         ///
-        ///
-        pub mod $name {
-
+        $modpub mod $modname {
             use $crate::*;
 
-            widget_refs!(WidgetRefs: $( $t => $i ),* );
-            with_gtk!(WidgetRefs);
+            widget_refs!($structname; $( $i : $t ),* );
+            with_gtk!($structname);
 
             pub fn init_storage_from_builder(builder: &gtk::Builder) {
-                let refs : WidgetRefs = builder.into();
+                let refs : $structname = builder.into();
                 init_storage(refs);
             }
         }

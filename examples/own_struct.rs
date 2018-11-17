@@ -1,36 +1,44 @@
 #![allow(dead_code, unused_variables, unused_imports, deprecated)]
 
+use std::rc::Rc;
+use core::cell::RefCell;
 use std::thread;
+
 
 use gtk::prelude::*;
 use gtk::{Button, Window, WindowType};
 
-use gtk_rs_state::gtk_refs;
 
 
-/* This macro emits the following elements:
-    pub mod widgets {
-        pub struct WidgetRefs {
-            pub main_window : gtk::Window,
-            ...
-        }
-        impl From<&gtk::Builder> for WidgetRefs { ... };
-        impl WidgetRefs {
-            fn main_window() -> gtk::Window { }
-            ...
-        }
+pub struct Refs {
+    button: gtk::Button,
+    // This is possible too
+    other_non_send_state : Rc<RefCell<Vec<String>>>
+}
 
-        pub fn init_storage(WidgetRefs);
-        pub fn init_storage_from_builder(&gtk::Builder);
-        pub fn do_in_gtk_eventloop( FnOnce(Rc<WidgetRefs>) );
-    }
-*/
-gtk_refs!(
-    pub mod widgets;                // The macro emits a new module with this name
-    struct WidgetRefs;              // The macro emits a struct with this name containing:
-    main_window : gtk::Window ,     // widget_name : Widgettype
-    button1 : gtk::Button           // ..
-);
+
+// This uses the macro with_gtk! and not gtk_refs!() as in the other examples
+// Better place the macro with_gtk! in a module, it pollutes its souroundings a bit
+mod r {
+    use super::Refs;
+    use gtk_rs_state::with_gtk;
+    /*  // This macro emits the following public elements:
+
+        pub fn init_storage(&Refs);
+        pub fn do_in_gtk_eventloop( FnOnce(Rc<Refs>) );
+
+        // And some private stuff which you must ignore
+        use std::...;
+        use gtk_rs_state::...;
+        type BoxedUiAction = ...;
+        type FnAndEvent = ...;
+        static (threadlocal) DATA = RefCell<Option<Rc<Refs>>>;
+        static (threadlocal) RX = RefCell<Option<Receiver<FnAndEvent>>;
+        static               TX = RefCell<Option<Sender<FnAndEvent>>;
+        fn handle_one_callback_in_gtk_thread();
+    */
+    with_gtk!(Refs);
+}
 
 fn main() {
 
@@ -58,14 +66,11 @@ fn main() {
 
     // You need the following two statements to prepare the
     // static storage needed for cross thread access.
-    // See the `from_glade.rs` example for a more elegant solution
-    let widget_references = widgets::WidgetRefs {
-        main_window: window.clone(),
-        button1:     button.clone(),
+    let widget_references = Refs {
+        button,
+        other_non_send_state : Rc::new(RefCell::new(vec!["Hi!".to_owned()]))
     };
-
-    widgets::init_storage(widget_references);
-    // End
+    r::init_storage(widget_references);
 
     // This type has a function for each of your widgets.
     // These functions return a clone() of the widget.
@@ -95,8 +100,9 @@ fn some_workfunction()  {
         i += 1;
         let text = format!("Round {} in {:?}", i, std::thread::current().id());
 
-        widgets::do_in_gtk_eventloop(|refs| {
-            refs.button1().set_label(&text);
+        r::do_in_gtk_eventloop(|refs| {
+            refs.button.set_label(&text);
+            refs.other_non_send_state.borrow_mut().push(text.to_owned());
         });
     }
  }

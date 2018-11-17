@@ -1,18 +1,36 @@
 #![allow(dead_code, unused_variables, unused_imports, deprecated)]
-#![feature(fnbox)]
 
 use std::thread;
 use gtk::prelude::*;
 
 use gtk_rs_state::gtk_refs;
 
+
+/* This macro emits the following elements:
+    mod widgets {
+        pub struct WidgetRefs {
+            pub main_window : gtk::Window,
+            ...
+        }
+        impl From<&gtk::Builder> for WidgetRefs { ... };
+        impl WidgetRefs {
+            fn main_window() -> gtk::Window { }
+            ...
+        }
+
+        pub fn init_storage(WidgetRefs);
+        pub fn init_storage_from_builder(&gtk::Builder);
+        pub fn do_in_gtk_eventloop( FnOnce(Rc<WidgetRefs>) );
+    }
+*/
 gtk_refs!(
-    widgets:                         // modulename
-    gtk::Window => main_window,     // Widgettype => widget_name_from_glade
-    gtk::Button => button1,
-    gtk::Button => button2,
-    gtk::Button => button3,
-    gtk::Entry => entry1
+    pub mod widgets;                // The macro emits a new module with this name
+    struct WidgetRefs;              // The macro emits a struct with this name containing:
+    main_window : gtk::Window,      // widget_name_from_glade : Widgettype
+    button1 : gtk::Button,
+    button2 : gtk::Button,
+    button3 : gtk::Button,
+    entry1 : gtk::Entry
 );
 
 fn main() {

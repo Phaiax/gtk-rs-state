@@ -30,68 +30,121 @@ version = "0.6.0"
 
 ## Example usage
 
-Note that the function `external_element_access` needs no reference to the widgets.
 
 ```rust
-gtk_refs!(
-    widgets:                        // The macro emits a new module with this name
-    gtk::Window => main_window,     // Widgettype => widget_name_from_glade
-    gtk::Button => button1,
-    gtk::Button => button2,
-    gtk::Button => button3,
-    gtk::Entry => entry1
-);
+    gtk_refs!(
+        pub mod widgets;                // The macro emits a new module with this name
+        struct WidgetRefs;              // The macro emits a struct with this name containing:
+        main_window : gtk::Window ,     // widget_name : Widgettype
+        button1 : gtk::Button           // ..
+    );
 
-fn main() {
-    gtk::init().unwrap();
-    let glade_src = include_str!("../ui.glade");
-    let builder = gtk::Builder::new_from_string(glade_src);
-    widgets::store_refs(&builder);
+    fn main() {
 
-    // Optional: You can use the WidgetRefs type as a helper in
-    // the main thread for yourself.
-    let refs = widgets::WidgetRefs::from(&builder);
+        if gtk::init().is_err() {
+            println!("Failed to initialize GTK.");
+            return;
+        }
 
-    // This type has a function for each of your widgets.
-    // These functions return a clone() of the widget.
-    refs.main_window().show_all();
+        let window = Window::new(WindowType::Toplevel);
+        window.set_title("gtk-rs-state Example Program");
+        window.set_default_size(350, 70);
+        let button = Button::new_with_label("Spawn another thread!");
+        window.add(&button);
+        window.show_all();
 
-    refs.main_window().connect_delete_event(move |_, _| {
-        gtk::main_quit();
-        Inhibit(false)
-    });
+        window.connect_delete_event(|_, _| {
+            gtk::main_quit();
+            Inhibit(false)
+        });
 
-    // Start event loop and some other thread
-    std::thread::spawn(external_element_access);
+        button.connect_clicked(|_| {
+            std::thread::spawn(some_workfunction);
+            println!("Clicked!");
+        });
 
-    gtk::main();
- }
+        // You need the following two statements to prepare the
+        // static storage needed for cross thread access.
+        // See the `from_glade.rs` example for a more elegant solution
+        let widget_references = widgets::WidgetRefs {
+            main_window: window.clone(),
+            button1:     button.clone(),
+        };
 
- fn external_element_access()  {
-    let blub : &str = "Blub!";
+        widgets::init_storage(widget_references);
+        // End
 
-    widgets::with_refs(|refs| {
-        refs.entry1().set_text(blub); // Note the borrowing
-    });
- }
+        // This type has a function for each of your widgets.
+        // These functions return a clone() of the widget.
+        window.show_all();
 
+        window.connect_delete_event(move |_, _| {
+            gtk::main_quit();
+            Inhibit(false)
+        });
+
+        // Start event loop
+        gtk::main();
+    }
+
+    fn compute() {
+        use std::thread::sleep;
+        use std::time::Duration;
+        sleep(Duration::from_secs(1));
+    }
+
+    fn some_workfunction()  {
+        let mut i = 0;
+
+        loop {
+            compute();
+
+            i += 1;
+            let text = format!("Round {} in {:?}", i, std::thread::current().id());
+
+            widgets::do_in_gtk_eventloop(|refs| {
+                refs.button1().set_label(&text);
+            });
+        }
+    }
 ```
+
+
+The macro generates the following code:
+
+```rust
+    pub mod widgets {
+        pub struct WidgetRefs {
+            pub main_window : gtk::Window,
+            ...
+        }
+        impl From<&gtk::Builder> for WidgetRefs { ... };
+        impl WidgetRefs {
+            fn main_window() -> gtk::Window { } // returns a .clone() of the widget
+            ...
+        }
+
+        pub fn init_storage(WidgetRefs);
+        pub fn init_storage_from_builder(&gtk::Builder);
+        pub fn do_in_gtk_eventloop( FnOnce(Rc<WidgetRefs>) );
+    }
+```
+
 
 ## How does it work?
 
-The closure you provide to `with_refs` is executed on the gtk event loop
-via `glib::idle_add`. `with_refs` does wait until the closure has run.
+ - The closure you provide to `do_in_gtk_eventloop(closure)` is executed on the gtk event loop via `glib::idle_add()`.
+ - `do_in_gtk_eventloop()` does wait until the closure has run.
+ - Closures from multiple threads will always run sequentially.
+ - If the closure panics, `do_in_gtk_eventloop()` will panic as well. You may not see the panic because the process will exit too fast.
 
-Closures from multiple threads will always run sequentially.
+## Please also see the examples folder if you n.
 
 
-# Notes:
+## Use of `unsafe`
 
+There is one usage of unsafe which is for convenience only. It allows the closure to reference the local stack instead of requiring 'static on the closure.
 
-## Unsafe
-
-There is one usage of unsafe which is for convenience only.
-You can easily remove the unsafe, but then you are forced to
-`move` everything into the `with_ref` closure.
+You can easily remove the unsafe, but then you are forced to `move` everything into the `with_ref` closure.
 
 
