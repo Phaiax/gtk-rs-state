@@ -191,7 +191,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "gtk-rs-state"
+name = "gtk-fnonce-on-eventloop"
 version = "0.2.0"
 dependencies = [
  "glib 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",

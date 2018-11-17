@@ -1,13 +1,9 @@
 
-# Global state for gtk-rs
+# Modify gtk widgets from other threads
 
 [reddit question](https://www.reddit.com/r/rust/comments/9uz3qn/what_is_the_best_way_to_structure_a_gtk_rust/)
 
 Runs on stable.
-
-This is not a library and not on crates.io because I am not sure if this is
-idiomatic and if the usage of unsafe is valid. If you want to use this,
-just copy the `src/withgtk.rs` into your project.
 
 This is not the fastest implementation, but for almost all
 use cases this should be enough.
@@ -18,18 +14,22 @@ You can use the newest versions, but you need glib next to gtk.
 
 ```toml
 [dependencies]
-lazy_static = "*"
-
-[dependencies.gtk]
-version = "0.5.0"
-features = ["v3_10"]
-
-[dependencies.glib]
-version = "0.6.0"
+gtk-fnonce-on-eventloop = "0.2"
 ```
+
+This crate uses these dependencies:
+ - gtk in version = "0.5.0" with features = ["v3_10"]
+ - glib in version = "0.6.0"
+
 
 ## Example usage
 
+Using this boils down to
+ - Call the gtk_refs! macro.
+ - Call init_storage() before starting the event loop
+ - Call do_in_gtk_eventloop() in other threads to modify the widgets
+
+Don't call do_in_gtk_eventloop() in the main thread since this will block.
 
 ```rust
     gtk_refs!(
@@ -47,7 +47,7 @@ version = "0.6.0"
         }
 
         let window = Window::new(WindowType::Toplevel);
-        window.set_title("gtk-rs-state Example Program");
+        window.set_title("gtk-fnonce-on-eventloop Example Program");
         window.set_default_size(350, 70);
         let button = Button::new_with_label("Spawn another thread!");
         window.add(&button);
@@ -134,15 +134,15 @@ The macro generates the following code:
 ## How does it work?
 
  - The closure you provide to `do_in_gtk_eventloop(closure)` is executed on the gtk event loop via `glib::idle_add()`.
- - `do_in_gtk_eventloop()` does wait until the closure has run.
+ - At the callsite `do_in_gtk_eventloop()` does wait until the closure has run.
  - Closures from multiple threads will always run sequentially.
- - If the closure panics, `do_in_gtk_eventloop()` will panic as well. You may not see the panic because the process will exit too fast.
+ - If the closure panics, `do_in_gtk_eventloop()` will panic as well. You may not see the panic because the process usually exits too fast.
 
 Please also see the examples folder if you want to:
     - Use additional non-send fields in the struct (other stuff than widget references)
     - Use glade
 
-## How does it really work?
+## How does the implementation work?
 
 ```text
 +---------------------------------+   +----------------------------------+

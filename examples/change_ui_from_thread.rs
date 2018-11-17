@@ -1,12 +1,12 @@
 
 extern crate gtk;
-extern crate gtk_rs_state;
+extern crate gtk_fnonce_on_eventloop;
 
 
 use gtk::prelude::*;
 use gtk::{Button, Window, WindowType};
 
-use gtk_rs_state::gtk_refs;
+use gtk_fnonce_on_eventloop::gtk_refs;
 
 
 /* This macro emits the following elements:
@@ -41,7 +41,7 @@ fn main() {
     }
 
     let window = Window::new(WindowType::Toplevel);
-    window.set_title("gtk-rs-state Example Program");
+    window.set_title("gtk-fnonce-on-eventloop Example Program");
     window.set_default_size(350, 70);
     let button = Button::new_with_label("Spawn another thread!");
     window.add(&button);

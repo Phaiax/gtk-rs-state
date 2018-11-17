@@ -88,7 +88,7 @@ macro_rules! with_gtk {
             // Notify the gtk event loop and perform the uiaction
             handle_one_callback_in_gtk_thread();
             // wait until gtk thread has executed the closure
-            event_callback_finished_rx.recv().expect("gtk-rs-state: do_in_gtk_eventloop(): The closure has paniced while executing!");
+            event_callback_finished_rx.recv().expect("gtk-fnonce-on-eventloop: do_in_gtk_eventloop(): The closure has paniced while executing!");
         }
 
         fn handle_one_callback_in_gtk_thread() {

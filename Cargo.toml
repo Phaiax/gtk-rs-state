@@ -1,5 +1,5 @@
 [package]
-name = "gtk-rs-state"
+name = "gtk-fnonce-on-eventloop"
 version = "0.2.0"
 authors = ["Phaiax <phaiax-git@invisibletower.de>"]
 #edition = "2018"

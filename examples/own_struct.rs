@@ -1,6 +1,6 @@
 
 extern crate gtk;
-extern crate gtk_rs_state;
+extern crate gtk_fnonce_on_eventloop;
 
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -22,7 +22,7 @@ pub struct Refs {
 // Better place the macro with_gtk! in a module, it pollutes its souroundings a bit
 mod r {
     use super::Refs;
-    use gtk_rs_state::with_gtk;
+    use gtk_fnonce_on_eventloop::with_gtk;
     /*  // This macro emits the following public elements:
 
         pub fn init_storage(&Refs);
@@ -30,7 +30,7 @@ mod r {
 
         // And some private stuff which you must ignore
         use std::...;
-        use gtk_rs_state::...;
+        use gtk_fnonce_on_eventloop::...;
         type BoxedUiAction = ...;
         type FnAndEvent = ...;
         static (threadlocal) DATA = RefCell<Option<Rc<Refs>>>;
@@ -49,7 +49,7 @@ fn main() {
     }
 
     let window = Window::new(WindowType::Toplevel);
-    window.set_title("gtk-rs-state Example Program");
+    window.set_title("gtk-fnonce-on-eventloop Example Program");
     window.set_default_size(350, 70);
     let button = Button::new_with_label("Spawn another thread!");
     window.add(&button);
